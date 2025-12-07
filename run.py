@@ -8,6 +8,10 @@ from backend.app.models import User, Project, File, Version, AuditLog
 
 app = create_app()
 
+# Auto-create database tables on startup (for Railway/production)
+with app.app_context():
+    db.create_all()
+
 
 @app.shell_context_processor
 def make_shell_context():

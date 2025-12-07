@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - RepoSync{% endblock %}
+
+{% block app_content %}
+<div class="dashboard">
+    <div class="page-header">
+        <div>
+            <h1>Projects</h1>
+            <p class="description">Manage your Excel files with version control</p>
+        </div>
+        {% if current_user.can_edit() %}
+        <button class="btn btn-primary" onclick="showCreateProjectModal()">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            New Project
+        </button>
+        {% endif %}
+    </div>
+
+    <div id="projectsList" class="projects-grid">
+        <!-- Projects will be loaded here -->
+    </div>
+</div>
+
+<div id="createProjectModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close" onclick="hideCreateProjectModal()">&times;</span>
+        <h2>Create New Project</h2>
+        <form id="createProjectForm">
+            <div class="form-group">
+                <label for="projectName">Project Name</label>
+                <input type="text" id="projectName" placeholder="Enter project name" required>
+            </div>
+            <div class="form-group">
+                <label for="projectDescription">Description</label>
+                <textarea id="projectDescription" rows="3" placeholder="Describe your project (optional)"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Create Project</button>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', loadProjects);
+
+async function loadProjects() {
+    try {
+        const response = await fetch('/api/projects');
+        const data = await response.json();
+        
+        const projectsList = document.getElementById('projectsList');
+        projectsList.innerHTML = '';
+        
+        if (data.projects.length === 0) {
+            projectsList.innerHTML = '<p class="no-data">No projects yet. Create your first project!</p>';
+            return;
+        }
+        
+        data.projects.forEach(project => {
+            const projectCard = document.createElement('div');
+            projectCard.className = 'project-card';
+            projectCard.innerHTML = `
+                <h3><a href="/projects/${project.id}">${project.name}</a></h3>
+                <p class="description">${project.description || 'No description'}</p>
+                <div class="project-meta">
+                    <span class="files-count">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        ${project.file_count} files
+                    </span>
+                    <span>${new Date(project.updated_at).toLocaleDateString()}</span>
+                </div>
+            `;
+            projectsList.appendChild(projectCard);
+        });
+    } catch (error) {
+        console.error('Error loading projects:', error);
+    }
+}
+
+function showCreateProjectModal() {
+    document.getElementById('createProjectModal').style.display = 'block';
+}
+
+function hideCreateProjectModal() {
+    document.getElementById('createProjectModal').style.display = 'none';
+    document.getElementById('createProjectForm').reset();
+}
+
+document.getElementById('createProjectForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = {
+        name: document.getElementById('projectName').value,
+        description: document.getElementById('projectDescription').value
+    };
+    
+    try {
+        const response = await fetch('/api/projects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        if (response.ok) {
+            hideCreateProjectModal();
+            loadProjects();
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to create project');
+        }
+    } catch (error) {
+        alert('An error occurred. Please try again.');
+    }
+});
+</script>
+{% endblock %}

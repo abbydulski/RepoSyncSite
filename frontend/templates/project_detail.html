@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Project Details - RepoSync{% endblock %}
+
+{% block app_content %}
+<div class="project-detail">
+    <div class="page-header">
+        <div>
+            <a href="{{ url_for('main.dashboard') }}" class="back-link">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                Back to Dashboard
+            </a>
+            <h1 id="projectName">Loading...</h1>
+            <p id="projectDescription" class="description"></p>
+        </div>
+        {% if current_user.can_edit() %}
+        <button class="btn btn-primary" onclick="showUploadModal()">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+            </svg>
+            Upload File
+        </button>
+        {% endif %}
+    </div>
+
+    <div class="project-files">
+        <h2>Files</h2>
+        <div id="filesList" class="files-list">
+            <!-- Files will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<!-- Upload File Modal -->
+<div id="uploadModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close" onclick="hideUploadModal()">&times;</span>
+        <h2>Upload Excel File</h2>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="fileInput">Select Excel File (.xlsx, .xlsm, .xls)</label>
+                <input type="file" id="fileInput" accept=".xlsx,.xlsm,.xls" required>
+            </div>
+            <div class="form-group">
+                <label for="commitMessage">Commit Message</label>
+                <input type="text" id="commitMessage" placeholder="Initial upload" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Upload</button>
+        </form>
+        <div id="uploadError" class="error-message"></div>
+    </div>
+</div>
+
+<script>
+const projectId = {{ project_id }};
+
+document.addEventListener('DOMContentLoaded', loadProject);
+
+async function loadProject() {
+    try {
+        const response = await fetch(`/api/projects/${projectId}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            document.getElementById('projectName').textContent = data.project.name;
+            document.getElementById('projectDescription').textContent = data.project.description || '';
+            renderFiles(data.project.files || []);
+        } else {
+            alert('Failed to load project');
+        }
+    } catch (error) {
+        console.error('Error loading project:', error);
+    }
+}
+
+function renderFiles(files) {
+    const filesList = document.getElementById('filesList');
+    filesList.innerHTML = '';
+    
+    if (files.length === 0) {
+        filesList.innerHTML = '<p class="no-files">No files yet. Upload your first Excel file!</p>';
+        return;
+    }
+    
+    files.forEach(file => {
+        const fileCard = document.createElement('div');
+        fileCard.className = 'file-card';
+        fileCard.innerHTML = `
+            <div class="file-info">
+                <h3><a href="/files/${file.id}">${file.filename}</a></h3>
+                <p>Version ${file.current_version} • Updated ${new Date(file.updated_at).toLocaleString()}</p>
+                <span class="file-status status-${file.status}">${file.status}</span>
+            </div>
+            <div class="file-actions">
+                ${file.checked_out_by ? 
+                    `<span class="checked-out">Checked out by ${file.checked_out_by}</span>` : 
+                    ''}
+            </div>
+        `;
+        filesList.appendChild(fileCard);
+    });
+}
+
+function showUploadModal() {
+    document.getElementById('uploadModal').style.display = 'block';
+}
+
+function hideUploadModal() {
+    document.getElementById('uploadModal').style.display = 'none';
+    document.getElementById('uploadForm').reset();
+    document.getElementById('uploadError').textContent = '';
+}
+
+document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const fileInput = document.getElementById('fileInput');
+    const commitMessage = document.getElementById('commitMessage').value;
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('commit_message', commitMessage);
+    formData.append('project_id', projectId);
+
+    try {
+        const response = await fetch('/api/files/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            hideUploadModal();
+            loadProject();
+        } else {
+            document.getElementById('uploadError').textContent = data.error || 'Upload failed';
+        }
+    } catch (error) {
+        document.getElementById('uploadError').textContent = 'An error occurred. Please try again.';
+    }
+});
+</script>
+{% endblock %}
+

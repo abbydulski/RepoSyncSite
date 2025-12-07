@@ -13,10 +13,11 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Database
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        'DATABASE_URL',
-        'postgresql://localhost/excel_gitlab_dev'
-    )
+    # Railway uses postgres:// but SQLAlchemy needs postgresql://
+    _database_url = os.getenv('DATABASE_URL', 'postgresql://localhost/excel_gitlab_dev')
+    if _database_url.startswith('postgres://'):
+        _database_url = _database_url.replace('postgres://', 'postgresql://', 1)
+    SQLALCHEMY_DATABASE_URI = _database_url
 
     # File Storage - use absolute paths based on project root
     STORAGE_PATH = os.getenv('STORAGE_PATH', os.path.join(BASE_DIR, 'storage', 'files'))
